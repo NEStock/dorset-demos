@@ -22,13 +22,13 @@ public class EmailManager {
 	private String user;
 	private String password;
 	private String mailStoreType = "imap";
-	private String host = "";
+	private String host = "kossi-dev.jhuapl.edu";
 	private Properties prop = new Properties();
 	 
 	private Session session;
 	private Store store;
 	private Folder inboxFolder;
-	private Folder seenFolder;
+	//private Folder seenFolder;
 	private Folder errorFolder;
 	private Folder completeFolder;
 	private Message[] unreadMessages = new Message[1];
@@ -36,7 +36,7 @@ public class EmailManager {
 	private ArrayDeque<Message> handler = new ArrayDeque<Message>();
 	
 	private final int INBOX = 1;
-	private final int SEEN = 2;
+	//private final int SEEN = 2;
 	private final int COMPLETE = 3;
 	private final int ERROR = 4;
 	private final int UNREAD = 5;
@@ -63,18 +63,19 @@ public class EmailManager {
 	    	e.printStackTrace();
 	    }
 	}	
+	
 	public void createFolders() {
 		try {
 		    if(!store.getFolder("Error").exists()) {
 		    	store.getFolder("Error").create(1);
 		    }	
-		    if(!store.getFolder("Seen").exists()) {
-		    	store.getFolder("Seen").create(1);
-		    }		    
+		   // if(!store.getFolder("Seen").exists()) {
+		    //	store.getFolder("Seen").create(1);
+		    //}		    
 		    if(!store.getFolder("Complete").exists()) {
 		    	store.getFolder("Complete").create(1);
 		    }
-		    seenFolder = store.getFolder("Seen");
+		    //seenFolder = store.getFolder("Seen");
 		    errorFolder = store.getFolder("Error");
 		    completeFolder = store.getFolder("Complete");
 		    inboxFolder = store.getFolder("INBOX");    
@@ -83,12 +84,13 @@ public class EmailManager {
 	    	e.printStackTrace();
 	    }
 	}	
+	
 	public Folder determineFolder(int folderNum) {
 		switch(folderNum) {
 			case INBOX: 
 				return inboxFolder;
-			case SEEN:
-				return seenFolder;
+			//case SEEN:
+				//return seenFolder;
 			case ERROR: 
 				return errorFolder;
 			case COMPLETE:
@@ -97,6 +99,7 @@ public class EmailManager {
 				return null;
 		}
 	}	
+	
 	public Message[] determineMsg(int folderNum) {
 		switch(folderNum) {
 			case UNREAD: 
@@ -107,44 +110,61 @@ public class EmailManager {
 				return null;
 		}
 	}
+	
 	public void openFolder(int folder) throws MessagingException {
 		determineFolder(folder).open(Folder.READ_WRITE);
 	}	
+	
 	public boolean folderIsOpen(int folder) {
 		return determineFolder(folder).isOpen();
-	}	
+	}
+	
 	public void closeFolder(int folder) throws MessagingException {
 		determineFolder(folder).close(false);
 	}	
+	
+	public void closeStore() throws MessagingException {
+		store.close();
+	}
+	
 	public int getCount(int folder) throws MessagingException {
 		return determineFolder(folder).getMessageCount();
 	}	
+	
 	public boolean getEmail(int folder, int msg) throws MessagingException {
 		determineMsg(msg)[0] = determineFolder(folder).getMessage(1);
 		if (msg == UNREAD) {
 			int n = 1;
 			while (determineMsg(msg)[0].isSet(Flags.Flag.SEEN)) {
+				System.out.println("getting email " + n);
 				determineMsg(msg)[0] = determineFolder(folder).getMessage(n);
 				n++;
 				if (n > determineFolder(folder).getMessageCount()) {
+					System.out.println("could not get email");
 					return false;
 				}
 			}
 		}
+		System.out.println("success in getting email");
 		return true;
 	}
+	
 	public void markSeen(int msg) throws MessagingException {
 		determineMsg(msg)[0].setFlag(Flags.Flag.SEEN, true);
 	}
+	
 	public void addToQ(int msg) {
 		 handler.addLast(determineMsg(msg)[0]);
 	}
+	
 	public boolean QisEmpty() {
 		return handler.isEmpty();
 	}
+	
 	public void removeFromQ(int msg) {
 		determineMsg(msg)[0] = handler.removeFirst();
 	}
+	
 	public String readEmail(int msg) throws MessagingException, IOException {
 		Message mess = determineMsg(msg)[0];
 		System.out.println("---------------------------------");
@@ -158,6 +178,7 @@ public class EmailManager {
 		
 		return toReturn;
 	}
+	
 	public String writePart(Part p) {
 		try {
 			if (p.isMimeType("text/plain")) {
@@ -184,10 +205,12 @@ public class EmailManager {
 		}
 		
 	}
+	
 	public String copyEmail(int fromFolder, int toFolder, int msg) throws MessagingException {
 		determineFolder(fromFolder).copyMessages(determineMsg(msg), determineFolder(toFolder));
 		return "email moved from " + fromFolder + " to " + toFolder;
 	}
+	
 	public String deleteEmail(int folder, int msg) throws MessagingException {
 		determineMsg(msg)[0].setFlag(Flags.Flag.DELETED, true);
     	determineFolder(folder).expunge();
@@ -195,6 +218,7 @@ public class EmailManager {
     	determineFolder(folder).open(Folder.READ_WRITE);
 		return "email deleted from " + folder;
 	}
+	
 	public String replyToEmail(String response, int msg) throws MessagingException{
 		Message replymsg = new MimeMessage(session);
 		String to = InternetAddress.toString(determineMsg(msg)[0].getReplyTo());
@@ -213,5 +237,4 @@ public class EmailManager {
 		}
 		return "email sent";
 	}
-	
 }

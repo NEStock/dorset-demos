@@ -16,22 +16,33 @@ public class EmailClient implements Runnable {
 	private Thread t;
 	private String threadName;
 	private final static int INBOX = 1;
-	private final static int SEEN = 2;
+	//private final static int SEEN = 2;
 	private final static int COMPLETE = 3;
 	private final static int ERROR = 4;
 	private final static int UNREAD = 5;
 	private final static int PROCESSING = 6;
 	private static EmailManager email;
 	private static int emailsLeftInbox;
+	private static int count = 0;
 	
-	EmailClient(String name) {
+	public EmailClient(String name) throws MessagingException {
 		threadName = name;
-		System.out.println("Creating " + threadName);
+		count++;
+		System.out.println("Creating " + threadName + "   count = " + count);
+		
+		if (email == null) {
+			email = new EmailManager("test", "password");
+			email.createFolders();
+		}		
+		if (!email.folderIsOpen(INBOX)) {
+			email.openFolder(INBOX); 
+		}
+		emailsLeftInbox = email.getCount(INBOX);
+		System.out.println("Inbox: " + emailsLeftInbox);	
 	} 
 	
-	public static void main (String[] args) throws MessagingException, IOException {
-		
-		email = new EmailManager("", "");
+	/*public static void main (String[] args) throws MessagingException, IOException {		
+		email = new EmailManager("test", "password");
 		email.createFolders();
 		
 		email.openFolder(INBOX); 
@@ -43,39 +54,47 @@ public class EmailClient implements Runnable {
 		
 		EmailClient T2 = new EmailClient("Thread-2");
 		T2.start();
-	}
+	}*/
+	
 	public static Agent determineAgent(String text) {
 		return new DateTimeAgent();
 	}
-	public void start() {
+	
+	/*public void start() {
 		System.out.println("Starting " + threadName);
 		if (t == null) {
 			t = new Thread (this, threadName);
 			t.start();
 		}
-	}
+	}*/
+	
 	public void run() {
 		System.out.println("Running " + threadName);
 		try {
 			if (threadName.equals("Thread-1")) {
-				while (emailsLeftInbox > 0 ) {
+				//polling email server continuously
+				//while (emailsLeftInbox > 0 ) {
+				if (emailsLeftInbox > 0 ) {					
 					if (!email.folderIsOpen(INBOX)) {
 						email.openFolder(INBOX); 
 					}
-					if(!email.getEmail(INBOX, UNREAD)) {
-						break;
+					if(email.getEmail(INBOX, UNREAD)) {
+						email.markSeen(UNREAD); 
+						System.out.println("seen");
+						email.addToQ(UNREAD);
+						emailsLeftInbox = email.getCount(INBOX);
+						sleepThread();
 					}
-					email.markSeen(UNREAD); 
-					email.addToQ(UNREAD);
-					Thread.sleep(100);
-					emailsLeftInbox = email.getCount(INBOX);
 				}
+				//}
 			}
 			else if (threadName.equals("Thread-2")) {
-				Thread.sleep(50);
-				while (!email.QisEmpty()) {
-					if (!email.folderIsOpen(SEEN)) {
-						email.openFolder(SEEN); 
+				//polling queue continuously
+				//while (!email.QisEmpty()) {
+				if (!email.QisEmpty()) {
+					
+					if (!email.folderIsOpen(INBOX)) {
+						email.openFolder(INBOX); 
 					}
 					email.removeFromQ(PROCESSING);
 					System.out.println("email to be read: ");
@@ -99,13 +118,36 @@ public class EmailClient implements Runnable {
 					
 					System.out.println(email.deleteEmail(INBOX, PROCESSING));
 					emailsLeftInbox = email.getCount(INBOX);
+					sleepThread();
 				}
+				//}
 			}
 		}
-		catch (InterruptedException | MessagingException | IOException e) {
+		catch (MessagingException | IOException e) {
 			e.printStackTrace();
 		}
 		System.out.println("Thread " + threadName + " exiting");
+	}	 
+	
+	public void sleepThread() {
+		try {
+			Thread.sleep(4000); 
+		}
+		catch (InterruptedException e) {
+			e.printStackTrace();
+		}
 	}
 	
+	public void closeAll() {
+		try {
+			System.out.println("closing");
+			if (email.folderIsOpen(INBOX)) {
+				email.closeFolder(INBOX);
+			}
+			email.closeStore();
+			
+		} catch (MessagingException e ) {
+			e.printStackTrace();
+		}
+	}
 }
